@@ -475,7 +475,10 @@ async function convert_2js(url, javaCode, callback) {
             if (key === 'constructor') return
             Object.keys(funcBlocks).map(key1 => {
                 if (key == key1 || key1 === 'constructor') return
-                funcBlocks[key1] = funcBlocks[key1].replaceAll((key + "("), ("await " + key + "("));
+
+                //(identifier + dot) zero or more times + key + left round bracket
+                const pattern = new RegExp("((([a-zA-Z_{1}][a-zA-Z0-9_$]*)\\.)*" + key + "\\()", "g")
+                funcBlocks[key1] = funcBlocks[key1].replaceAll(pattern, ("await $1"));
             })
 
             Object.keys(exteralFuncs).map(funct => {
