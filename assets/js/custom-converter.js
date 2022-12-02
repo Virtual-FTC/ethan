@@ -19,8 +19,8 @@ const gamepadBoxVars = {
 }
 
 const replaceJSString = [
-    ,[": number ", ""]
-    ,[": string ", ""]
+    ,[": number", ""]
+    ,[": string", ""]
     , ["{}", "{\n}"]
     , ['opModeIsActive', 'linearOpMode.opModeIsActive']
     , ['Range.clip(', 'range.clip(']
