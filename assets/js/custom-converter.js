@@ -294,7 +294,7 @@ const customConvert = (str) => {
         return `motor.setProperty([${mortorVars[varName]}], 'Direction', ['${value}']);`;
     }
     else if (str.includes('waitForStart()')) {
-        return str.replace('waitForStart', 'await linearOpMode.waitForStart');
+        return str.replace('waitForStart', 'linearOpMode.waitForStart');
     }
     else if (str.includes('.setPower(')) {
         let matches = /this.(\w+).setPower\((.*)\);/g.exec(result);
@@ -357,7 +357,7 @@ const customConvert = (str) => {
     else if (str.includes("while (")) {
         let sides = str.split("while (");
         const value = valueChecker(sides[1].split(") {")[0]);
-        return `while (${value}) {await linearOpMode.sleep(1);\n` + sides[1].split(") {")[1];
+        return `while (${value}) {linearOpMode.sleep(1);\n` + sides[1].split(") {")[1];
     }
     else if (str.includes("for (")) {
         let sides = str.split("for (");
@@ -383,7 +383,7 @@ const customConvert = (str) => {
         return `telemetry.addData(${newVars});`
     }
     else if (str.includes('sleep')) {
-        return "await linearOpMode.sleep(" + str.split("sleep(")[1];
+        return "linearOpMode.sleep(" + str.split("sleep(")[1];
     } else
         return valueChecker(str);
 }
@@ -424,14 +424,17 @@ async function convert_2js(url, javaCode, callback) {
         result = result.replaceAll(/\bparseFloat\b/g, "")
         result = result.replaceAll(/\bJavaUtil./g, "misc.")
 
-
+        const className = /export class (\w+)/g.exec(result)[1];
 
         if(/export class (\w+) extends LinearOpMode\b/g.test(result)){
+            result = result.replace(/(export class (\w+)) extends LinearOpMode\b/g, "$1")
             OpMode = "LinearOpMode"
         }else if(/export class (\w+) extends OpMode\b/g.test(result)){
+            result = result.replace(/(export class (\w+)) extends OpMode\b/g, "$1")
             OpMode = "OpMode"
         }else
             return "Parse Error"
+
 
         console.log(OpMode)
         result = result.split('\n');
@@ -442,73 +445,32 @@ async function convert_2js(url, javaCode, callback) {
             if(middleVars){
                 lineTxt = lineTxt.replace(/\bDistanceUnit.(\w+)/g, `"${middleVars[1]}"`)
             }
-
-            brackets += checkBrackets(lineTxt);
-            // var
-            if (brackets == 1 && !funcName) {
-                const values = /(public)? (\w+)\((.*)\)(: void)? {/g.exec(lineTxt)
-                funcName =   values[2];
-                funcBlocks[funcName] = [];
-                funcValues[funcName] = values[3];
-            } else if (brackets > 0) {
-
-                var jsLine = customConvert(lineTxt);
-                if (jsLine != "") funcBlocks[funcName].push(jsLine);
-
-            } else if (brackets == 0 && funcName) {
-                if (funcName != 'constructor')
-                    funcBlocks[funcName] = funcBlocks[funcName].join("\n");
-                funcName = '';
-            }
+            result[i] = customConvert(lineTxt)
         }
 
-        console.log("Vars : ", mortorVars, colorVars, funcBlocks, funcValues)
-        // funcBlocks['runOpMode'] = funcBlocks['runOpMode'].join("\n")
-        if (typeof funcBlocks['constructor'] != 'function' && funcBlocks['constructor'])
-            funcBlocks['constructor'].map(line => {
-                const varValue = line.trim().split(" = ")
-                if (mortorVars[varValue[0]] != undefined || colorVars[varValue[0]] != undefined) return false
-
-                jsString += "var " + line + "\n"
-            })
-        Object.keys(funcBlocks).map(key => {
-            if (key === 'constructor') return
-            Object.keys(funcBlocks).map(key1 => {
-                if (key == key1 || key1 === 'constructor') return
-
-                //(identifier + dot) zero or more times + key + left round bracket
-                const pattern = new RegExp("((([a-zA-Z_{1}][a-zA-Z0-9_$]*)\\.)*" + key + "\\()", "g")
-                funcBlocks[key1] = funcBlocks[key1].replaceAll(pattern, ("await $1"));
-            })
-
-            Object.keys(exteralFuncs).map(funct => {
-                if (funcBlocks[key].includes(funct)) {
-                    funcBlocks[key] = funcBlocks[key].replaceAll(funct, exteralFuncs[funct][0])
-                    jsString += exteralFuncs[funct][1] + "\n"
-                }
-            })
-        })
-
-        Object.keys(funcBlocks).map(key => {
-            if (key != "constructor")
-                jsString += `async function ${key}(${funcValues[key]}) {
-                ${funcBlocks[key]}
-            }\n`
-        })
+        const tsTranspiler = tsNode.register({transpileOnly:true})
+        jsString = tsTranspiler
+            .compile(result.join("\n"), "result.ts") //"result.ts" means nothing
+            .split("\n")
+            .slice(3, -2) //TS has lines for exports and "strict" which are removed here
+            .join("\n")
 
         if (OpMode == "LinearOpMode")
             jsString += `
-            await runOpMode();`
+            const program = new ${className}();
+            program.runOpMode();`
         else
             jsString += `
-            async function runOpMode() {
-                await init();
-                while (!linearOpMode.isStarted())
-                  await init_loop();
-                await start();
+            const program = new ${className}()
+            function runOpMode() {
+                program.init();
+                while (!linearOpMode.isStarted()) {
+                    program.init_loop();
+                }
+                program.start();
                 while (linearOpMode.opModeIsActive())
-                  await loop();
-                await stop();
+                    program.loop();
+                program.stop();
               }
 
             await runOpMode();`

@@ -2,9 +2,12 @@
 // It has the same sandbox as a Chrome extention.
 dgram = require("dgram");
 
+
+
 var socket = dgram.createSocket("udp4")
 var s = dgram.createSocket('udp4');
 
+window.tsNode = require("ts-node")
 window.net = require('net');
 
 window.udpSocket = {
