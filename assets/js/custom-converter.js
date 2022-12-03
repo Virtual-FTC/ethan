@@ -294,7 +294,7 @@ const customConvert = (str) => {
         return `motor.setProperty([${mortorVars[varName]}], 'Direction', ['${value}']);`;
     }
     else if (str.includes('waitForStart()')) {
-        return str.replace('waitForStart', 'linearOpMode.waitForStart');
+        return str.replace('waitForStart', 'await linearOpMode.waitForStart');
     }
     else if (str.includes('.setPower(')) {
         let matches = /this.(\w+).setPower\((.*)\);/g.exec(result);
@@ -357,7 +357,7 @@ const customConvert = (str) => {
     else if (str.includes("while (")) {
         let sides = str.split("while (");
         const value = valueChecker(sides[1].split(") {")[0]);
-        return `while (${value}) {linearOpMode.sleep(1);\n` + sides[1].split(") {")[1];
+        return `while (${value}) {await linearOpMode.sleep(1);\n` + sides[1].split(") {")[1];
     }
     else if (str.includes("for (")) {
         let sides = str.split("for (");
@@ -383,7 +383,10 @@ const customConvert = (str) => {
         return `telemetry.addData(${newVars});`
     }
     else if (str.includes('sleep')) {
-        return "linearOpMode.sleep(" + str.split("sleep(")[1];
+        return "await linearOpMode.sleep(" + str.split("sleep(")[1];
+    } else if (/(\w+\s)*\w+\((\w+(,\s?\w+)*)?\)/g.test(str)) {
+        //replace <function header> with "async <function header>"
+        return str.replace(/((\w+\s)*\w+\((\w+(,\s?\w+)*)?\))/g, "async $1")
     } else
         return valueChecker(str);
 }
@@ -458,20 +461,20 @@ async function convert_2js(url, javaCode, callback) {
         if (OpMode == "LinearOpMode")
             jsString += `
             const program = new ${className}();
-            program.runOpMode();`
+            await program.runOpMode();`
         else
             jsString += `
             const program = new ${className}()
-            function runOpMode() {
-                program.init();
+            async function runOpMode() {
+                await program.init();
                 while (!linearOpMode.isStarted()) {
-                    program.init_loop();
+                    await program.init_loop();
                 }
-                program.start();
+                await program.start();
                 while (linearOpMode.opModeIsActive())
-                    program.loop();
-                program.stop();
-              }
+                    await program.loop();
+                await program.stop();
+            }
 
             await runOpMode();`
 
