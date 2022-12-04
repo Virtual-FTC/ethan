@@ -374,9 +374,14 @@ const customConvert = (str) => {
             else if (sides[s] == ')') bracketCount--
             if (bracketCount == 0 && sides[s] == ',') break;
         }
-        sides = [sides.substring(0, s), sides.substring(s + 2, sides.length)]
+        const regexCommaNotBetweenQuotes = /("[^"]*")|,/g;
         let newVars = []
-        sides.map(item => {
+        const arguments = sides
+            .split(regexCommaNotBetweenQuotes)
+            .filter(a => typeof(a)==="string")
+            .map(a=> a.trim())
+            .filter(a => a!=="")
+        arguments.map(item => {
             newVars.push(valueChecker(item))
         })
         newVars = newVars.join(", ");
@@ -384,9 +389,9 @@ const customConvert = (str) => {
     }
     else if (str.includes('sleep')) {
         return "await linearOpMode.sleep(" + str.split("sleep(")[1];
-    } else if (/(\w+\s)*\w+\((\w+(,\s?\w+)*)?\)/g.test(str)) {
+    } else if (/(\w+\s)*\w+\((\w+(,\s?\w+)*)?\)\s*(:\s*\w+)?\s*{/g.test(str)) {
         //replace <function header> with "async <function header>"
-        return str.replace(/((\w+\s)*\w+\((\w+(,\s?\w+)*)?\))/g, "async $1")
+        return str.replace(/((\w+\s)*\w+\((\w+(,\s?\w+)*)?\)\s*(:\s*\w+)?\s*{)/g, "async $1")
     } else
         return valueChecker(str);
 }
@@ -451,11 +456,13 @@ async function convert_2js(url, javaCode, callback) {
             result[i] = customConvert(lineTxt)
         }
 
+        const regexWordExportsNotBetweenQuotes = /("[^"]*")|(exports|export)/;
         const tsTranspiler = tsNode.register({transpileOnly:true})
         jsString = tsTranspiler
             .compile(result.join("\n"), "result.ts") //"result.ts" means nothing
             .split("\n")
-            .slice(3, -2) //TS has lines for exports and "strict" which are removed here
+            .filter(line => !line.includes('"use strict"') && !line.includes("'use strict'"))
+            .filter(line => !regexWordExportsNotBetweenQuotes.test(line))
             .join("\n")
 
         if (OpMode == "LinearOpMode")
