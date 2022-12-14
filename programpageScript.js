@@ -1,3 +1,36 @@
+//---Prompts---
+var overlayReturned = null;
+
+//Overrides Window.Prompt for Variable Renaming
+window.prompt = function overlayPrompt(message, placeholder) {
+	overlayReturned = null;
+	overlay(true, (message == "New variable name:" ? 2 : 3));
+	return new Promise(function (resolve, reject) {
+		var returnChecker = setInterval(function () {
+			if (overlayReturned == -1) {
+				reject();
+				clearInterval(returnChecker);
+			} else if (overlayReturned != null) {
+				resolve(overlayReturned);
+				clearInterval(returnChecker);
+			}
+		}, 250);
+	});
+}
+
+//---Gamepad Connections---
+window.addEventListener("gamepadconnected", (event) => {
+	if (event.gamepad.index < 2) {
+		document.getElementById("telemetryText").innerText = 'New Controller: "' + event.gamepad.id + '".\nSet Controller to gamepad' + (event.gamepad.index + 1) + ".";
+	}
+});
+
+window.addEventListener("gamepaddisconnected", (event) => {
+	if (event.gamepad.index < 2) {
+		document.getElementById("telemetryText").innerText = 'Controller disconnected: "' + event.gamepad.id + '".\nGamepad' + (event.gamepad.index + 1) + " lost.";
+	}
+});
+
 //Wait for 3 HttpRequests and then load last saved program
 settingUp = 4;
 
@@ -1013,4 +1046,41 @@ function playAdvancedVideo(videoType) {
     } else
         link = 'https://www.youtube.com/embed/HvywykxdrBU?list=PLszFVnnZcmarYReNB-qCSZLiu2l3Mvlvz';
 	openTab(link);
+}
+
+//---Switching between Blocks and Java---
+function switchToBlocks() {
+	document.getElementById('blocksBttn').classList.add('button1Selected');
+	document.getElementById('javaBttn').classList.remove('button1Selected');
+
+	document.getElementById('blocklyDiv').hidden = false;
+	document.getElementById('onBotJavaDiv').hidden = true;
+	isUsingBlocks = true;
+	if (currentProjectName != "program")
+		try {
+			lastSaved = Blockly.Xml.textToDom(localStorage.getItem("Program Name: " + currentProjectName))
+		}
+		catch {
+			lastSaved = null;
+		}
+	else
+		lastSaved = null;
+	prepareUiToLoadProgram();
+	if (Blockly.mainWorkspace)
+		Blockly.svgResize(Blockly.mainWorkspace);
+}
+
+function switchToOnBotJava() {
+	document.getElementById('javaBttn').classList.add('button1Selected');
+	document.getElementById('blocksBttn').classList.remove('button1Selected');
+
+	resetProgramExecution();
+	document.getElementById('blocklyDiv').hidden = true;
+	document.getElementById('onBotJavaDiv').hidden = false;
+	isUsingBlocks = false;
+	if (javaProjectName != "program")
+		lastSaved = localStorage.getItem("Java Program Name: " + javaProjectName);
+	else
+		lastSaved = null;
+	prepareUiToLoadProgram();
 }
